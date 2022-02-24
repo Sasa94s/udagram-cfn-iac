@@ -1,0 +1,119 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Mostafa Elsheikh | Udacity 2021
+  AWS CloudFormation Template for Udagram IAM and Security Groups
+Parameters:
+  EnvironmentName:
+    Description: Environment Name
+    Type: "String"
+    Default: "udagram-app"
+  StageName:
+    Description: Stage Name
+    Type: "String"
+    Default: "dev"
+    AllowedPattern: "dev|test|pre-prod|prod"
+Resources:
+  WebIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${EnvironmentName}-${StageName}-web-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: "/"
+      Tags:
+        - Key: Network
+          Value: Public
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Stage
+          Value: !Ref StageName
+        - Key: Name
+          Value: "Web IAM Role"
+  WebIamPolicies:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub "${EnvironmentName}-${StageName}-web-policies"
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Action:
+              - "ssm:Get*"
+              - "s3:Get*"
+            Resource: "*"
+      Roles:
+        - !Ref WebIamRole
+  WebInstanceProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      Path: "/"
+      Roles:
+        - !Ref WebIamRole
+  LoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow HTTP to our Load Balancer
+      VpcId:
+        Fn::ImportValue: !Sub "${EnvironmentName}-${StageName}-udagram-vpc"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Stage
+          Value: !Ref StageName
+        - Key: Name
+          Value: Load Balancer Security Group
+  WebAppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow SSH connections from Bastion Host
+      VpcId:
+        Fn::ImportValue: !Sub "${EnvironmentName}-${StageName}-udagram-vpc"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          SourceSecurityGroupId:
+            Fn::ImportValue: !Sub "${EnvironmentName}-${StageName}-bastion-sg"
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref LoadBalancerSecurityGroup
+      Tags:
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Stage
+          Value: !Ref StageName
+        - Key: Name
+          Value: Web EC2 Instances Security Group
+Outputs:
+  WebIamInstanceProfile:
+    Description: Reference of Web IAM Instance Profile
+    Value: !Ref WebInstanceProfile
+    Export:
+      Name: !Sub "${EnvironmentName}-${StageName}-web-iam-instance-prof"
+  WebAppSecurityGroup:
+    Description: Reference of Web Security Group
+    Value: !Ref WebAppSecurityGroup
+    Export:
+      Name: !Sub "${EnvironmentName}-${StageName}-web-sg"
+  LoadBalancerSecurityGroup:
+    Description: Reference of Load Balancer Security Group
+    Value: !Ref LoadBalancerSecurityGroup
+    Export:
+      Name: !Sub "${EnvironmentName}-${StageName}-lb-sg"

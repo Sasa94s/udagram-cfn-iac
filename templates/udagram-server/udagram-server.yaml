@@ -1,0 +1,203 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  Mostafa Elsheikh | Udacity 2021
+  AWS CloudFormation Template for Udagram Worker Nodes
+Parameters:
+  EnvironmentName:
+    Description: Environment Name
+    Type: "String"
+    Default: "udagram-app"
+  StageName:
+    Description: Stage Name
+    Type: "String"
+    Default: "dev"
+    AllowedPattern: "dev|test|pre-prod|prod"
+  PrivateSubnets:
+    Description: List of Private Subnets
+    Type: CommaDelimitedList
+  PublicSubnets:
+    Description: List of Public Subnets
+    Type: CommaDelimitedList
+  InstanceType:
+    Description: WebServer EC2 instance type
+    Type: "String"
+    Default: t2.micro
+    ConstraintDescription: must be a valid EC2 instance type.
+Mappings:
+  AWSInstanceType2Arch:
+    t1.micro:
+      Arch: HVM64
+    t2.nano:
+      Arch: HVM64
+    t2.micro:
+      Arch: HVM64
+    t2.small:
+      Arch: HVM64
+    t2.medium:
+      Arch: HVM64
+    t2.large:
+      Arch: HVM64
+  AWSRegionArch2AMI:
+    us-east-1:
+      HVM64: ami-032930428bf1abbff
+      HVMG2: ami-0aeb704d503081ea6
+    us-west-2:
+      HVM64: ami-01fee56b22f308154
+      HVMG2: ami-0fe84a5b4563d8f27
+Resources:
+  WebHostsLaunchConfig:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      ImageId: !FindInMap
+        - AWSRegionArch2AMI
+        - !Ref 'AWS::Region'
+        - !FindInMap
+          - AWSInstanceType2Arch
+          - !Ref InstanceType
+          - Arch
+      IamInstanceProfile:
+        Fn::ImportValue: !Sub "${EnvironmentName}-${StageName}-web-iam-instance-prof"
+      SecurityGroups:
+        - Fn::ImportValue: !Sub "${EnvironmentName}-${StageName}-web-sg"
+      InstanceType: !Ref InstanceType
+      BlockDeviceMappings:
+        - DeviceName: "/dev/sdk"
+          Ebs:
+            VolumeSize: "10"
+            DeleteOnTermination: true
+            VolumeType: "gp2"
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update
+          yum install unzip apache2 -y
+          aws ssm get-parameter --name udagramBastionKey --with-decryption --output text --query Parameter.Value --region ${AWS::Region} > authorized_keys
+          cp ./authorized_keys ~/.ssh/
+          chmod 700 /home/ubuntu/.ssh/authorized_keys
+
+          cd /var/www/html
+          rm index.html
+          aws s3 cp s3://udagram-s3-store/udacity.zip . 
+          unzip -o udacity.zip
+          mv src/index.html .
+          rm -R src
+
+          chown -R www-data:www-data .
+          systemctl start apache2.service
+  WebHostsAutoSecurityGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      LaunchConfigurationName: !Ref WebHostsLaunchConfig
+      VPCZoneIdentifier:
+        - Fn::ImportValue: !Select [0, !Ref PrivateSubnets]
+        - Fn::ImportValue: !Select [1, !Ref PrivateSubnets]
+      MinSize: 4
+      MaxSize: 6
+      DesiredCapacity: 4
+      TargetGroupARNs:
+        - !Ref WebAppTargetGroup
+      Tags:
+        - Key: Environment
+          PropagateAtLaunch: True
+          Value: !Ref EnvironmentName
+        - Key: Stage
+          PropagateAtLaunch: True
+          Value: !Ref StageName
+        - Key: Name
+          PropagateAtLaunch: True
+          Value: !Sub "${EnvironmentName}-${StageName}-web-autoscaling-sg"
+    UpdatePolicy:
+      AutoScalingReplacingUpdate:
+        WillReplace: True
+  WebAppLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Subnets:
+        - Fn::ImportValue: !Select [0, !Ref PublicSubnets]
+        - Fn::ImportValue: !Select [1, !Ref PublicSubnets]
+      SecurityGroups:
+        - Fn::ImportValue: !Sub "${EnvironmentName}-${StageName}-lb-sg"
+  WebAppListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref WebAppTargetGroup
+      LoadBalancerArn: !Ref WebAppLoadBalancer
+      Port: 80
+      Protocol: HTTP
+  LoadBalancerListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+        - Type: forward
+          TargetGroupArn: !Ref WebAppTargetGroup
+      Conditions:
+        - Field: path-pattern
+          Values: [ / ]
+      ListenerArn: !Ref WebAppListener
+      Priority: 1
+  WebAppTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Port: 80
+      Protocol: HTTP
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 8
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 5
+      VpcId:
+        Fn::ImportValue: !Sub "${EnvironmentName}-${StageName}-udagram-vpc"
+  WebAppScaleUpPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      AutoScalingGroupName: !Ref WebHostsAutoSecurityGroup
+      Cooldown: 60
+      ScalingAdjustment: 1
+  WebAppScaleDownPolicy:
+    Type: AWS::AutoScaling::ScalingPolicy
+    Properties:
+      AdjustmentType: ChangeInCapacity
+      AutoScalingGroupName: !Ref WebHostsAutoSecurityGroup
+      Cooldown: 300
+      ScalingAdjustment: -1
+  WebAppCPUAlarmHigh:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: "CpuHigh"
+      AlarmDescription: Scale-up if CPU usage is > 80% for 5 minutes
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 80
+      ComparisonOperator: GreaterThanThreshold
+      AlarmActions:
+        - !Ref WebAppScaleUpPolicy
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value: !Ref WebHostsAutoSecurityGroup
+  WebAppCPUAlarmLow:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: Scale-down if CPU usage is < 60% for 5 minutes
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 60
+      ComparisonOperator: LessThanThreshold
+      AlarmActions:
+        - !Ref WebAppScaleDownPolicy
+      Dimensions:
+        - Name: AutoScalingGroupName
+          Value: !Ref WebHostsAutoSecurityGroup
+Outputs:
+  Website:
+    Description: The Public DNS for the EC2 Instance
+    Value: !Join [ "", [ "http://", !GetAtt [ WebAppLoadBalancer, DNSName ] ] ]

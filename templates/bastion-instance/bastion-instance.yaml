@@ -1,0 +1,98 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Mostafa Elsheikh | Udacity 2021
+  AWS CloudFormation Template for Bastion instance
+Parameters:
+  EnvironmentName:
+    Description: Environment Name
+    Type: "String"
+    Default: "udagram-app"
+  StageName:
+    Description: Stage Name
+    Type: "String"
+    Default: "dev"
+    AllowedPattern: "dev|test|pre-prod|prod"
+  ComponentNumber:
+    Description: Instance Number
+    Type: "Number"
+  KeyParameterName:
+    Description: Name of an parameter name of EC2 KeyPair stored in SSM Parameter Store
+    Type: "String"
+    ConstraintDescription: must be the name of an existing parameter in SSM Parameter Store.
+  KeyFileName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instances
+    Type: "AWS::EC2::KeyPair::KeyName"
+    ConstraintDescription: must be the name of an existing EC2 KeyPair.
+  InstanceType:
+    Description: WebServer EC2 instance type
+    Type: "String"
+    Default: t2.micro
+    ConstraintDescription: must be a valid EC2 instance type.
+Mappings:
+  AWSInstanceType2Arch:
+    t1.micro:
+      Arch: HVM64
+    t2.nano:
+      Arch: HVM64
+    t2.micro:
+      Arch: HVM64
+    t2.small:
+      Arch: HVM64
+    t2.medium:
+      Arch: HVM64
+    t2.large:
+      Arch: HVM64
+  AWSRegionArch2AMI:
+    us-east-1:
+      HVM64: ami-032930428bf1abbff
+      HVMG2: ami-0aeb704d503081ea6
+    us-west-2:
+      HVM64: ami-01fee56b22f308154
+      HVMG2: ami-0fe84a5b4563d8f27
+Resources:
+  Bastion:
+    Type: AWS::EC2::Instance
+    Properties:
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          aws ssm get-parameter --name ${KeyParameterName} --with-decryption --output text --query Parameter.Value > ~/.ssh/${KeyFileName}
+          chmod 0400 ~/.ssh/${KeyFileName}
+      IamInstanceProfile:
+        Fn::ImportValue: !Sub "${EnvironmentName}-${StageName}-bastion-iam-instance-prof"
+      SecurityGroupIds:
+        - Fn::ImportValue: !Sub "${EnvironmentName}-${StageName}-bastion-sg-group-id"
+      SubnetId:
+        Fn::ImportValue: !Sub "${EnvironmentName}-${StageName}-public-subnet-${ComponentNumber}"
+      ImageId: !FindInMap
+        - AWSRegionArch2AMI
+        - !Ref 'AWS::Region'
+        - !FindInMap
+          - AWSInstanceType2Arch
+          - !Ref InstanceType
+          - Arch
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyFileName
+  EIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain:
+        Fn::ImportValue: !Sub "${EnvironmentName}-${StageName}-udagram-vpc"
+  EIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    DependsOn:
+      - Bastion
+      - EIP
+    Properties:
+      InstanceId:
+        Ref: Bastion
+      AllocationId:
+        Fn::GetAtt:
+          - EIP
+          - AllocationId
+Outputs:
+  BastionPrivateIp:
+    Description: Private IP of Bastion Instance
+    Value: !GetAtt Bastion.PrivateIp
+    Export:
+      Name: !Sub "${EnvironmentName}-${StageName}-bastion-private-ip-${ComponentNumber}"

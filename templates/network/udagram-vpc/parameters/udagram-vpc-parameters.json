@@ -1,0 +1,14 @@
+[
+  {
+    "ParameterKey": "EnvironmentName",
+    "ParameterValue": "udagram-app"
+  },
+  {
+    "ParameterKey": "StageName",
+    "ParameterValue": "dev"
+  },
+  {
+    "ParameterKey": "VpcCIDR",
+    "ParameterValue": "10.0.0.0/16"
+  }
+]

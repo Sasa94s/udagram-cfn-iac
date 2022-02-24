@@ -1,0 +1,10 @@
+[
+  {
+    "ParameterKey": "EnvironmentName",
+    "ParameterValue": "udagram-app"
+  },
+  {
+    "ParameterKey": "StageName",
+    "ParameterValue": "dev"
+  }
+]

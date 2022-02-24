@@ -1,0 +1,22 @@
+[
+  {
+    "ParameterKey": "EnvironmentName",
+    "ParameterValue": "udagram-app"
+  },
+  {
+    "ParameterKey": "StageName",
+    "ParameterValue": "dev"
+  },
+  {
+    "ParameterKey": "PublicSubnets",
+    "ParameterValue": "udagram-app-dev-public-subnet-1, udagram-app-dev-public-subnet-2"
+  },
+  {
+    "ParameterKey": "PrivateSubnets",
+    "ParameterValue": "udagram-app-dev-private-subnet-1, udagram-app-dev-private-subnet-2"
+  },
+  {
+    "ParameterKey": "InstanceType",
+    "ParameterValue": "t2.small"
+  }
+]

@@ -1,0 +1,46 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description:
+Parameters:
+  EnvironmentName:
+    Description: Environment Name
+    Type: 'String'
+    Default: 'udagram-app'
+  StageName:
+    Description: Stage Name
+    Type: 'String'
+    Default: 'dev'
+    AllowedPattern: 'dev|test|pre-prod|prod'
+Resources:
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow HTTP to EC2 and SHH access from Bastion instances
+      VpcId:
+        Fn::ImportValue: !Sub '${EnvironmentName}-${StageName}-udagram-vpc'
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Sub
+            - '${ip}/32'
+            - ip:
+              Fn::ImportValue: !Sub '${EnvironmentName}-bastion-private-ip-1'
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Sub
+            - '${ip}/32'
+            - ip:
+              Fn::ImportValue: !Sub '${EnvironmentName}-bastion-private-ip-2'
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-WASG

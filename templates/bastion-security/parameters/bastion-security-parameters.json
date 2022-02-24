@@ -1,0 +1,14 @@
+[
+  {
+    "ParameterKey": "EnvironmentName",
+    "ParameterValue": "udagram-app"
+  },
+  {
+    "ParameterKey": "StageName",
+    "ParameterValue": "dev"
+  },
+  {
+    "ParameterKey": "SSHLocation",
+    "ParameterValue": "62.114.181.242/32"
+  }
+]

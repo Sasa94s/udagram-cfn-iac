@@ -1,0 +1,22 @@
+[
+  {
+    "ParameterKey": "EnvironmentName",
+    "ParameterValue": "udagram-app"
+  },
+  {
+    "ParameterKey": "StageName",
+    "ParameterValue": "dev"
+  },
+  {
+    "ParameterKey": "ComponentNumber",
+    "ParameterValue": "1"
+  },
+  {
+    "ParameterKey": "PublicSubnetCIDR",
+    "ParameterValue": "10.0.0.0/24"
+  },
+  {
+    "ParameterKey": "PrivateSubnetCIDR",
+    "ParameterValue": "10.0.2.0/24"
+  }
+]

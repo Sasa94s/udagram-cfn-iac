@@ -1,0 +1,83 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Mostafa Elsheikh | Udacity 2021
+  AWS CloudFormation Template for Udagram VPC
+Parameters:
+  EnvironmentName:
+    Description: Environment Name
+    Type: "String"
+    Default: "udagram-app"
+  StageName:
+    Description: Stage Name
+    Type: "String"
+    Default: "dev"
+    AllowedPattern: "dev|test|pre-prod|prod"
+  VpcCIDR:
+    Description: Please enter the IP range (CIDR notation) for this VPC
+    Type: "String"
+    Default: 10.0.0.0/16
+    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      CidrBlock: !Ref VpcCIDR
+      Tags:
+        - Key: Network
+          Value: Public
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Stage
+          Value: !Ref StageName
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Network
+          Value: Public
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Stage
+          Value: !Ref StageName
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Network
+          Value: Public
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Stage
+          Value: !Ref StageName
+  DefaultPublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+Outputs:
+  VPC:
+    Description: Reference of Udagram VPC
+    Value: !Ref VPC
+    Export:
+      Name: !Sub "${EnvironmentName}-${StageName}-udagram-vpc"
+  InternetGatewayAttachment:
+    Description: Reference of Udagram Internet Gateway Attachment
+    Value: !Ref InternetGatewayAttachment
+    Export:
+      Name: !Sub "${EnvironmentName}-${StageName}-iga"
+  PublicRouteTable:
+    Description: Reference of Public Route table
+    Value: !Ref PublicRouteTable
+    Export:
+      Name: !Sub "${EnvironmentName}-${StageName}-prt"

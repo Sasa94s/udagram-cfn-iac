@@ -1,0 +1,26 @@
+[
+  {
+    "ParameterKey": "EnvironmentName",
+    "ParameterValue": "udagram-app"
+  },
+  {
+    "ParameterKey": "StageName",
+    "ParameterValue": "dev"
+  },
+  {
+    "ParameterKey": "ComponentNumber",
+    "ParameterValue": "1"
+  },
+  {
+    "ParameterKey": "KeyParameterName",
+    "ParameterValue": "udagram/bastion/key"
+  },
+  {
+    "ParameterKey": "KeyFileName",
+    "ParameterValue": "udagramBastionKey"
+  },
+  {
+    "ParameterKey": "InstanceType",
+    "ParameterValue": "t2.small"
+  }
+]

@@ -1,0 +1,91 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >-
+  Mostafa Elsheikh | Udacity 2021
+  AWS Cloud Formation Template for Bastion IAM and Security Groups
+Parameters:
+  EnvironmentName:
+    Description: Environment Name
+    Type: "String"
+    Default: "udagram-app"
+  StageName:
+    Description: Stage Name
+    Type: "String"
+    Default: "dev"
+    AllowedPattern: "dev|test|pre-prod|prod"
+  SSHLocation:
+    Description: The IP address range that can be used to SSH to the EC2 instances
+    Type: String
+    MinLength: "9"
+    MaxLength: "18"
+    Default: 0.0.0.0/0
+    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+Resources:
+  BastionIamRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${EnvironmentName}-${StageName}-bastion-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: "/"
+  BastionPolicies:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub "${EnvironmentName}-${StageName}-bastion-policies"
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Action:
+              - "ssm:Get*"
+            Resource: "*"
+      Roles:
+        - !Ref BastionIamRole
+  BastionIamInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: "/"
+      Roles:
+        - !Ref BastionIamRole
+  BastionSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Administrator SSH access to Bastion host
+      VpcId:
+        Fn::ImportValue: !Sub "${EnvironmentName}-${StageName}-udagram-vpc"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: "22"
+          ToPort: "22"
+          CidrIp: !Ref SSHLocation
+      Tags:
+        - Key: Network
+          Value: Public
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: Stage
+          Value: !Ref StageName
+        - Key: Name
+          Value: "Bastion SecurityGroup"
+Outputs:
+  BastionIamInstanceProfile:
+    Description: Reference of Bastion IAM Instance Profile
+    Value: !Ref BastionIamInstanceProfile
+    Export:
+      Name: !Sub "${EnvironmentName}-${StageName}-bastion-iam-instance-prof"
+  BastionSecurityGroup:
+    Description: Reference of Bastion Security Group
+    Value: !Ref BastionSecurityGroup
+    Export:
+      Name: !Sub "${EnvironmentName}-${StageName}-bastion-sg"
+  BastionSecurityGroupId:
+    Description: Reference of Bastion Security Group
+    Value: !GetAtt BastionSecurityGroup.GroupId
+    Export:
+      Name: !Sub "${EnvironmentName}-${StageName}-bastion-sg-group-id"
