@@ -14,10 +14,10 @@ Parameters:
     AllowedPattern: "dev|test|pre-prod|prod"
   PrivateSubnets:
     Description: List of Private Subnets
-    Type: CommaDelimitedList
+    Type: "CommaDelimitedList"
   PublicSubnets:
     Description: List of Public Subnets
-    Type: CommaDelimitedList
+    Type: "CommaDelimitedList"
   InstanceType:
     Description: WebServer EC2 instance type
     Type: "String"
@@ -70,15 +70,15 @@ Resources:
         Fn::Base64: !Sub |
           #!/bin/bash
           yum update
-          yum install unzip apache2 -y
+          yum install -y unzip apache2
           aws ssm get-parameter --name udagramBastionKey --with-decryption --output text --query Parameter.Value --region ${AWS::Region} > authorized_keys
           cp ./authorized_keys ~/.ssh/
-          chmod 700 /home/ubuntu/.ssh/authorized_keys
+          chmod 700 ~/.ssh/authorized_keys
 
           cd /var/www/html
           rm index.html
-          aws s3 cp s3://udagram-s3-store/udacity.zip . 
-          unzip -o udacity.zip
+          aws s3 cp s3://udagram-web-store/udagram.zip . 
+          unzip -o udagram.zip
           mv src/index.html .
           rm -R src
 
@@ -89,8 +89,8 @@ Resources:
     Properties:
       LaunchConfigurationName: !Ref WebHostsLaunchConfig
       VPCZoneIdentifier:
-        - Fn::ImportValue: !Select [0, !Ref PrivateSubnets]
-        - Fn::ImportValue: !Select [1, !Ref PrivateSubnets]
+        - Fn::ImportValue: !Select [ 0, !Ref PrivateSubnets ]
+        - Fn::ImportValue: !Select [ 1, !Ref PrivateSubnets ]
       MinSize: 4
       MaxSize: 6
       DesiredCapacity: 4
@@ -113,8 +113,8 @@ Resources:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
       Subnets:
-        - Fn::ImportValue: !Select [0, !Ref PublicSubnets]
-        - Fn::ImportValue: !Select [1, !Ref PublicSubnets]
+        - Fn::ImportValue: !Select [ 0, !Ref PublicSubnets ]
+        - Fn::ImportValue: !Select [ 1, !Ref PublicSubnets ]
       SecurityGroups:
         - Fn::ImportValue: !Sub "${EnvironmentName}-${StageName}-lb-sg"
   WebAppListener:
